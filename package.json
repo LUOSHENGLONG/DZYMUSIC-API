@@ -8,5 +8,9 @@
   },
   "keywords": [],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "jsonwebtoken": "^8.4.0",
+    "nedb-session-store": "^1.1.2"
+  }
 }
