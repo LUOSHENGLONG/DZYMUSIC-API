@@ -223,8 +223,8 @@ app.post('/synth',function(req, res) {
       resolve(result[0])
     })
   }).then((count) => {
-    connection.query(`SELECT id,type,title,content,look,issuer,releaseTime FROM article where type = "synthesizer" limit ?,?`,
-    [(req.body.currentPage-1)*10+1,10],
+    connection.query(`SELECT id,type,title,content,look,issuer,releaseTime,img FROM article where type = "synthesizer" ORDER BY releaseTime,id desc limit ?,?`,
+    [(req.body.currentPage-1)*10,9],
     (err, result) => {
       if(err){
         console.log(err)
@@ -256,8 +256,8 @@ app.post('/effects',function(req, res) {
       resolve(result[0])
     })
   }).then((count) => {
-    connection.query(`SELECT id,type,title,content,look,issuer,releaseTime FROM article where type = "effects" limit ?,?`,
-    [(req.body.currentPage-1)*10+1,10],
+    connection.query(`SELECT id,type,title,content,look,issuer,releaseTime,img FROM article where type = "effects" ORDER BY releaseTime,id desc limit ?,?`,
+    [(req.body.currentPage-1)*10,9],
     (err, result) => {
       if(err){
         console.log(err)
@@ -289,8 +289,8 @@ app.post('/samplePack',function(req, res) {
       resolve(result[0])
     })
   }).then((count) => {
-    connection.query(`SELECT id,type,title,content,look,issuer,releaseTime FROM article where type = "samplePack" limit ?,?`,
-    [(req.body.currentPage-1)*10+1,10],
+    connection.query(`SELECT id,type,title,content,look,issuer,releaseTime,img FROM article where type = "samplePack" ORDER BY releaseTime,id desc limit ?,?`,
+    [(req.body.currentPage-1)*10,9],
     (err, result) => {
       if(err){
         console.log(err)
@@ -322,8 +322,8 @@ app.post('/tutorial',function(req, res) {
       resolve(result[0])
     })
   }).then((count) => {
-    connection.query(`SELECT id,type,title,content,look,issuer,releaseTime FROM article where type = "tutorial" limit ?,?`,
-    [(req.body.currentPage-1)*10+1,10],
+    connection.query(`SELECT id,type,title,content,look,issuer,releaseTime,img FROM article where type = "tutorial" ORDER BY releaseTime,id desc limit ?,?`,
+    [(req.body.currentPage-1)*10,9],
     (err, result) => {
       if(err){
         console.log(err)
@@ -355,8 +355,8 @@ app.post('/host',function(req, res) {
       resolve(result[0])
     })
   }).then((count) => {
-    connection.query(`SELECT id,type,title,content,look,issuer,releaseTime FROM article where type = "host" limit ?,?`,
-    [(req.body.currentPage-1)*10+1,10],
+    connection.query(`SELECT id,type,title,content,look,issuer,releaseTime,img FROM article where type = "host" ORDER BY releaseTime,id desc limit ?,?`,
+    [(req.body.currentPage-1)*10,9],
     (err, result) => {
       if(err){
         console.log(err)
@@ -399,6 +399,86 @@ app.post('/info',function(req, res) {
   })
 })
 
+// ------------rightData1---------------
+app.post('/rightData1',function(req, res) {
+  console.log(req.body)
+  new Promise((resolve,reject) => {
+    connection.query(`SELECT id,title FROM article order by releaseTime,id desc limit 0,9`,(err, result) => {
+      if(err){
+        console.log(err)
+        reject(err)
+        return
+      }
+      resolve(result)
+      
+    })
+  })
+  .then(result => {
+    res.send({
+      data: result
+    })
+  })
+  .catch(err => {
+    console.log(err)
+  })
+})
+
+// ------------rightData2---------------
+app.post('/rightData2',function(req, res) {
+  console.log(req.body)
+  new Promise((resolve,reject) => {
+    connection.query(`SELECT id,title FROM article order by "like",id desc limit 0,9`,(err, result) => {
+      if(err){
+        console.log(err)
+        reject(err)
+        return
+      }
+      resolve(result)
+      
+    })
+  })
+  .then(result => {
+    res.send({
+      data: result
+    })
+  })
+  .catch(err => {
+    console.log(err)
+  })
+})
+// ------------search---------------
+app.post('/search',function(req, res) {
+  console.log(req.body)
+  const keyword = `%` + req.body.keyword + `%`
+  new Promise((resolve,reject) => {
+    connection.query('SELECT count(id) FROM article where title like ?',[keyword],(err, result) => {
+      if(err){
+        console.log(err)
+        reject(err)
+        return
+      }
+      resolve(result[0])
+    })
+  }).then((count) => {
+    connection.query(`SELECT id,type,title,content,look,issuer,releaseTime,img FROM article where title like ? ORDER BY releaseTime,id desc limit ?,?`,
+    [keyword, (req.body.currentPage-1)*10,9],
+    (err, result) => {
+      if(err){
+        console.log(err)
+        reject(err)
+        return
+      }
+      if(result.length > 0) {
+        res.send({
+          count: count,
+          data: result
+        })
+      }
+    })
+  }).catch(err => {
+    console.log(err)
+  })
+})
 app.listen(3001,function () {    ////监听3000端口
     console.log('Server running at 3001 port');
 });
