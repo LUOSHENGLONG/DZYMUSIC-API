@@ -88,8 +88,9 @@ app.post('/login',function (req,res) {
           let content ={name:req.body.name}; // 要生成token的主题信息
           let secretOrPrivateKey="dzymusic" // 这是加密的key（密钥） 
           let token = jwt.sign(content, secretOrPrivateKey, {
-                  expiresIn: 60*60*1  // 1小时过期
+                  expiresIn: 60*30*1               // 1小时过期
               });
+              console.log(token)
           result[0].token = token    //token写入数据库    
 
           connection.query(
@@ -127,10 +128,28 @@ app.post('/login',function (req,res) {
   }).catch( err => {
     console.log(err)
   })
-  
-  
-
 });
+// -----------登录验证---------------
+app.post('/confirmLogin',(req, res) => {
+  let token = req.body.token
+  jwt.verify(token, 'dzymusic', (error, decoded) => {
+    if (error) {
+      console.log(error.message)
+      console.log(111111111111111)
+      res.send({
+        isLogin: false
+      })
+      return
+    }
+    console.log(222222222222222)
+    console.log(decoded)
+    res.send({
+      isLogin: true
+    })
+  })
+})
+
+
 // -----------注册---------------
 app.post('/register',function (req,res) {
   let username = req.body.username
@@ -398,54 +417,6 @@ app.post('/info',function(req, res) {
     console.log(err)
   })
 })
-
-// ------------rightData1---------------
-app.post('/rightData1',function(req, res) {
-  console.log(req.body)
-  new Promise((resolve,reject) => {
-    connection.query(`SELECT id,title FROM article order by releaseTime,id desc limit 0,9`,(err, result) => {
-      if(err){
-        console.log(err)
-        reject(err)
-        return
-      }
-      resolve(result)
-      
-    })
-  })
-  .then(result => {
-    res.send({
-      data: result
-    })
-  })
-  .catch(err => {
-    console.log(err)
-  })
-})
-
-// ------------rightData2---------------
-app.post('/rightData2',function(req, res) {
-  console.log(req.body)
-  new Promise((resolve,reject) => {
-    connection.query(`SELECT id,title FROM article order by "like",id desc limit 0,9`,(err, result) => {
-      if(err){
-        console.log(err)
-        reject(err)
-        return
-      }
-      resolve(result)
-      
-    })
-  })
-  .then(result => {
-    res.send({
-      data: result
-    })
-  })
-  .catch(err => {
-    console.log(err)
-  })
-})
 // ------------search---------------
 app.post('/search',function(req, res) {
   console.log(req.body)
@@ -473,12 +444,226 @@ app.post('/search',function(req, res) {
           count: count,
           data: result
         })
+      }else {
+        res.send({
+          count: 1,
+          data: 0
+        })
       }
     })
   }).catch(err => {
     console.log(err)
   })
 })
+// ------------rightData1---------------
+app.post('/rightData1',function(req, res) {
+  console.log(req.body)
+  new Promise((resolve,reject) => {
+    connection.query(`SELECT id,title,type FROM article order by releaseTime,id desc limit 0,9`,(err, result) => {
+      if(err){
+        console.log(err)
+        reject(err)
+        return
+      }
+      resolve(result)
+      
+    })
+  })
+  .then(result => {
+    res.send({
+      data: result
+    })
+  })
+  .catch(err => {
+    console.log(err)
+  })
+})
+
+// ------------rightData2---------------
+app.post('/rightData2',function(req, res) {
+  console.log(req.body)
+  new Promise((resolve,reject) => {
+    connection.query(`SELECT id,title,type FROM article order by "like",id desc limit 0,9`,(err, result) => {
+      if(err){
+        console.log(err)
+        reject(err)
+        return
+      }
+      resolve(result)
+      
+    })
+  })
+  .then(result => {
+    res.send({
+      data: result
+    })
+  })
+  .catch(err => {
+    console.log(err)
+  })
+})
+// ------------homeData---------------
+app.post('/homeData',function(req, res) {
+  let homeData = []
+  console.log(req.body)
+  getHomeData("synthesizer")
+  .then(synthesizer => {
+    homeData.push(synthesizer)
+    
+  })
+
+  getHomeData("effects")
+  .then(effects => {
+    homeData.push(effects)
+  })
+
+  getHomeData("samplePack")
+  .then(samplePack => {
+    homeData.push(samplePack)
+  })
+
+  getHomeData("tutorial")
+  .then(tutorial => {
+    homeData.push(tutorial)
+  })
+
+  getHomeData("host")
+  .then(host => {
+    homeData.push(host) 
+    res.send({
+      data: homeData
+    })
+  })
+  
+  
+  
+
+})
+
+function getHomeData(type){
+  return new Promise((resolve,reject) => {
+    connection.query(`SELECT id,title,content,img,releaseTime FROM article where type = "${type}" order by releaseTime,id desc limit 0,10`,(err, type) => {
+      if(err){
+        console.log(err)
+        reject(err)
+        return
+      }
+      resolve(type)
+      
+    })
+  })
+}
+
+// ------------sendComment---------------
+app.post('/sendComment',function(req, res) {
+  const id = req.body.id
+  const topicId = req.body.topicId
+  const topicType = req.body.topicType
+  const content = req.body.content
+  const fromUid = req.body.fromUid
+  const createTime = req.body.createTime
+  const like = req.body.like
+
+
+  new Promise((resolve,reject) => {
+    connection.query(`INSERT INTO comments VALUES(?,?,?,?,?,?,?)`,
+      [id, topicId, topicType, content, fromUid, createTime, like],
+      (err, result) => {
+      if(err){
+        console.log(err)
+        reject(err)
+        return
+      }
+      resolve(result)
+      
+    })
+  })
+  .then(result => {
+    res.send({
+      data: result
+    })
+  })
+  .catch(err => {
+    console.log(err)
+  })
+})
+
+// ------------sendReply---------------
+app.post('/sendReply',function(req, res) {
+  const id = req.body.id
+  const commentId = req.body.commentId
+  const replyId = req.body.replyId
+  const replyType = req.body.replyType
+  const content = req.body.content
+  const fromUid = req.body.fromUid
+  const toUid = req.body.toUid
+  const createTime = req.body.createTime
+
+
+  new Promise((resolve,reject) => {
+    connection.query(`INSERT INTO replys VALUES(?,?,?,?,?,?,?,?)`,
+      [id, commentId, replyId, replyType, content, fromUid, toUid, createTime],
+      (err, result) => {
+      if(err){
+        console.log(err)
+        reject(err)
+        return
+      }
+      resolve(result)
+      
+    })
+  })
+  .then(result => {
+    res.send({
+      data: result
+    })
+  })
+  .catch(err => {
+    console.log(err)
+  })
+})
+
+// ------------getComment---------------
+app.post('/getComment',function(req, res) {
+  const id = req.body.id
+
+  new Promise((resolve,reject) => {
+    connection.query(
+      `SELECT c.id,c.topic_id,c.content,c.createTime,c.from_uid,u.avatar,u.nickname FROM comments c LEFT JOIN users u ON c.from_uid = u.id WHERE c.topic_id = ? ORDER BY c.createTime DESC`,
+      [id],
+      (err, comments) => {
+        if(err){
+          console.log(err)
+          reject(err)
+          return
+        }
+        resolve(comments)
+      }
+    )
+  })
+  .then(comments => {
+    connection.query(
+      `SELECT r.comment_id,r.content,r.createTime,r.from_uid,r.reply_id,r.reply_type,r.to_uid,u.nickname,u.avatar FROM replys r LEFT JOIN users u ON r.from_uid = u.id WHERE r.comment_id = ? ORDER BY r.createTime DESC
+      `,
+      [id],
+      (err, replys) => {
+        if(err){
+          console.log(err)
+          reject(err)
+          return
+        }
+        res.send({
+          comments,
+          replys
+        })
+      }
+    )
+  })
+  .catch(err => {
+    console.log(err)
+  })
+})
+
 app.listen(3001,function () {    ////监听3000端口
     console.log('Server running at 3001 port');
 });
