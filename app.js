@@ -394,6 +394,39 @@ app.post('/host',function(req, res) {
   })
 })
 
+// ------------effects---------------
+app.post('/last',function(req, res) {
+  console.log(req.body)
+  new Promise((resolve,reject) => {
+    connection.query('SELECT count(id) FROM article',(err, result) => {
+      if(err){
+        console.log(err)
+        reject(err)
+        return
+      }
+      resolve(result[0])
+    })
+  }).then((count) => {
+    connection.query(`SELECT id,type,title,content,look,issuer,releaseTime,img FROM article ORDER BY releaseTime,id desc limit ?,?`,
+    [(req.body.currentPage-1)*10,9],
+    (err, result) => {
+      if(err){
+        console.log(err)
+        reject(err)
+        return
+      }
+      if(result.length > 0) {
+        res.send({
+          count: count,
+          data: result
+        })
+      }
+    })
+  }).catch(err => {
+    console.log(err)
+  })
+})
+
 // ------------info---------------
 app.post('/info',function(req, res) {
   console.log(req.body)
@@ -554,6 +587,90 @@ function getHomeData(type){
   })
 }
 
+// ------------favorite---------------
+app.post('/favorite',function(req, res) {
+  const id = req.body.id
+  const articleId = req.body.articleId
+  const userId = req.body.userId
+  const createTime = req.body.createTime
+
+
+  new Promise((resolve,reject) => {
+    connection.query(`INSERT INTO favorite VALUES(?,?,?,?)`,
+      [id, articleId, userId, createTime],
+      (err, result) => {
+      if(err){
+        console.log(err)
+        reject(err)
+        return
+      }
+      resolve(result)
+      
+    })
+  })
+  .then(result => {
+    res.send({
+      data: result
+    })
+  })
+  .catch(err => {
+    console.log(err)
+  })
+})
+
+// ------------getFavorite---------------
+app.post('/getFavorite',function(req, res) {
+  const articleId = req.body.articleId
+  const userId = req.body.userId
+  new Promise((resolve,reject) => {
+    connection.query(`SELECT COUNT(id) as count FROM favorite WHERE articleId = ? and userId = ?`,
+      [articleId, userId],
+      (err, result) => {
+      if(err){
+        console.log(err)
+        reject(err)
+        return
+      }
+      resolve(result)
+      
+    })
+  })
+  .then(result => {
+    res.send({
+      isFavorite: result[0].count
+    })
+  })
+  .catch(err => {
+    console.log(err)
+  })
+})
+
+// ------------cancelFavorite---------------
+app.post('/cancelFavorite',function(req, res) {
+  const articleId = req.body.articleId
+  const userId = req.body.userId
+  new Promise((resolve,reject) => {
+    connection.query(`DELETE FROM favorite WHERE articleId = ? and userId = ?`,
+      [articleId, userId],
+      (err, result) => {
+      if(err){
+        console.log(err)
+        reject(err)
+        return
+      }
+      resolve(result)
+    })
+  })
+  .then(result => {
+    res.send({
+      cancelFavorite: result
+    })
+  })
+  .catch(err => {
+    console.log(err)
+  })
+})
+
 // ------------sendComment---------------
 app.post('/sendComment',function(req, res) {
   const id = req.body.id
@@ -596,13 +713,14 @@ app.post('/sendReply',function(req, res) {
   const replyType = req.body.replyType
   const content = req.body.content
   const fromUid = req.body.fromUid
+  const fromNickname = req.body.fromNickname
   const toUid = req.body.toUid
   const createTime = req.body.createTime
 
 
   new Promise((resolve,reject) => {
-    connection.query(`INSERT INTO replys VALUES(?,?,?,?,?,?,?,?)`,
-      [id, commentId, replyId, replyType, content, fromUid, toUid, createTime],
+    connection.query(`INSERT INTO replys VALUES(?,?,?,?,?,?,?,?,?)`,
+      [id, commentId, replyId, replyType, content, fromUid, fromNickname, toUid, createTime],
       (err, result) => {
       if(err){
         console.log(err)
@@ -643,7 +761,7 @@ app.post('/getComment',function(req, res) {
   })
   .then(comments => {
     connection.query(
-      `SELECT r.comment_id,r.content,r.createTime,r.from_uid,r.reply_id,r.reply_type,r.to_uid,u.nickname,u.avatar FROM replys r LEFT JOIN users u ON r.from_uid = u.id WHERE r.comment_id = ? ORDER BY r.createTime DESC
+      `SELECT r.comment_id,r.content,r.createTime,r.from_uid,r.fromNickname,r.reply_id,r.reply_type,r.to_uid,u.nickname,u.avatar FROM replys r LEFT JOIN users u ON r.to_uid = u.id WHERE r.comment_id = ? ORDER BY r.createTime DESC
       `,
       [id],
       (err, replys) => {
@@ -658,6 +776,31 @@ app.post('/getComment',function(req, res) {
         })
       }
     )
+  })
+  .catch(err => {
+    console.log(err)
+  })
+})
+
+app.post('/toUidFormat', function(req, res) {
+  new Promise((resolve,reject) => {
+    connection.query(
+      `SELECT nickname FROM users where id = ? limit 1`,
+      [req.body.userId],
+      (err, nickname) => {
+        if(err){
+          console.log(err)
+          reject(err)
+          return
+        }
+        resolve(nickname[0])
+      }
+    )
+  })
+  .then(nickname => {
+    res.send({
+      nickname
+    })
   })
   .catch(err => {
     console.log(err)
