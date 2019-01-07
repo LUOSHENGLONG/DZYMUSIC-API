@@ -1,12 +1,28 @@
-const express = require('express')   //引入express模块
+//引入express模块
+const express = require('express')   
+
 const Parameter = require('parameter')
+
 const session = require('express-session')
+
 const md5 = require('blueimp-md5')
+
 // const jwt = require('jwt-simple')
 const jwt = require('jsonwebtoken')
+
 const moment = require('moment')
-const mysql = require('mysql');     //引入mysql模块
+
+//引入mysql模块
+const mysql = require('mysql');
+
+//引入fs模块
+const fs = require('fs')
+
+//引入multer模块
+const multer = require('multer')
+
 const NedbStore = require('nedb-session-store')( session );
+
 const sessionMiddleware = session({
     secret: "fas fas",
     resave: false,
@@ -24,7 +40,13 @@ const sessionMiddleware = session({
 const app = express();        //创建express的实例
 const connection = require('./connection.js') //引入连接数据库模块
 const bodyParser = require('body-parser')
+
+
+
 app.use(sessionMiddleware);
+
+var upload = require('./routes/upload');
+const login = require('./routes/login')
 
 // 解析 application/json
 app.use(bodyParser.json()); 
@@ -44,6 +66,9 @@ app.all('*', function (req, res, next) {
       next();
   }
 });
+
+app.use('/upload', upload);
+
 
 connection.connect();
 
@@ -129,6 +154,7 @@ app.post('/login',function (req,res) {
     console.log(err)
   })
 });
+
 // -----------登录验证---------------
 app.post('/confirmLogin',(req, res) => {
   let token = req.body.token
@@ -157,6 +183,7 @@ app.post('/register',function (req,res) {
   const phoneConfirm = new RegExp("(^1[3,4,5,6,7,9,8][0-9]{9}$|14[0-9]{9}|15[0-9]{9}$|18[0-9]{9}$)")
   // 手机验证
   let sqlName = ""
+  let nickname = ""
   const emailConfirm = /^[\w-]+(\.[\w-]+)*@[\w-]+(\.[\w-]+)+$/
   if( emailConfirm.test(username)){
     sqlName = `email`
@@ -203,9 +230,40 @@ app.post('/register',function (req,res) {
     function getId() {
       return (((1+Math.random())*0x10000)|0).toString(16).substring(1);
     }
+    function randomWord(randomFlag, min, max){
+      var str = "",
+          range = min,
+          arr = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j', 'k', 'l', 'm', 'n', 'o', 'p', 'q', 'r', 's', 't', 'u', 'v', 'w', 'x', 'y', 'z', 'A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N', 'O', 'P', 'Q', 'R', 'S', 'T', 'U', 'V', 'W', 'X', 'Y', 'Z'];
+      // 随机产生
+      if(randomFlag){
+          range = Math.round(Math.random() * (max-min)) + min;
+      }
+      for(var i=0; i<range; i++){
+          pos = Math.round(Math.random() * (arr.length-1));
+          str += arr[pos];
+      }
+      return str;
+    }
+    nickname = randomWord(true,6,8)
+
+    function formatDateTime() {
+      const date = new Date()  
+      var y = date.getFullYear();  
+      var m = date.getMonth() + 1;  
+      m = m < 10 ? ('0' + m) : m;  
+      var d = date.getDate();  
+      d = d < 10 ? ('0' + d) : d;  
+      var h = date.getHours();  
+      h=h < 10 ? ('0' + h) : h;  
+      var minute = date.getMinutes();  
+      minute = minute < 10 ? ('0' + minute) : minute;  
+      var second=date.getSeconds();  
+      second=second < 10 ? ('0' + second) : second;  
+      return y + '-' + m + '-' + d+' '+h+':'+minute+':'+second;  
+    };
     const selectSql = ``
-    connection.query(`INSERT users(id,user_id,`+sqlName+`,PASSWORD) VALUES(?,?,?,?)`,
-      [getId(),"user6",username,password] , 
+    connection.query(`INSERT users(id,user_id,`+sqlName+`,PASSWORD,nickname,createTime) VALUES(?,?,?,?,?,?)`,
+      [randomWord(true,18,20),nickname,username,password,nickname,formatDateTime()], 
       (err, result) => {
         if(err){
           console.log("注册出错")
@@ -450,6 +508,7 @@ app.post('/info',function(req, res) {
     console.log(err)
   })
 })
+
 // ------------search---------------
 app.post('/search',function(req, res) {
   console.log(req.body)
@@ -488,6 +547,7 @@ app.post('/search',function(req, res) {
     console.log(err)
   })
 })
+
 // ------------rightData1---------------
 app.post('/rightData1',function(req, res) {
   console.log(req.body)
@@ -535,6 +595,7 @@ app.post('/rightData2',function(req, res) {
     console.log(err)
   })
 })
+
 // ------------homeData---------------
 app.post('/homeData',function(req, res) {
   let homeData = []
@@ -575,7 +636,7 @@ app.post('/homeData',function(req, res) {
 
 function getHomeData(type){
   return new Promise((resolve,reject) => {
-    connection.query(`SELECT id,title,content,img,releaseTime FROM article where type = "${type}" order by releaseTime,id desc limit 0,10`,(err, type) => {
+    connection.query(`SELECT id,title,content,img,releaseTime,type FROM article where type = "${type}" order by releaseTime,id desc limit 0,10`,(err, type) => {
       if(err){
         console.log(err)
         reject(err)
@@ -586,6 +647,37 @@ function getHomeData(type){
     })
   })
 }
+
+// ------------avatar---------------
+app.post('/avatar',function(req, res) {
+  const userId = req.body.userId
+  const blob = req.body.blob
+  console.log("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
+  console.log(req.body)
+  console.log(blob)
+  console.log(userId)
+  new Promise((resolve,reject) => {
+    connection.query(`INSERT INTO my values(?,?) `,
+      [userId,blob],
+      (err, result) => {
+      if(err){
+        console.log(err)
+        reject(err)
+        return
+      }
+      resolve(result)
+      
+    })
+  })
+  .then(result => {
+    res.send({
+      data: result
+    })
+  })
+  .catch(err => {
+    console.log(err)
+  })
+})
 
 // ------------favorite---------------
 app.post('/favorite',function(req, res) {
@@ -806,6 +898,42 @@ app.post('/toUidFormat', function(req, res) {
     console.log(err)
   })
 })
+
+// ------------likeData-----------------
+app.post('/likeData', function(req, res) {
+  const userId = req.body.userId
+  const currentPage = req.body.currentPage
+  console.log(currentPage)
+  new Promise((resolve, reject) => {
+    connection.query('SELECT count(id) as count FROM favorite  WHERE userId = ?',
+      [userId],
+      (err, count) => {
+        if(err) {
+          console.log(err)
+          reject(err)
+          return 
+        }
+        resolve(count)
+      })
+  })
+  .then( count => {
+    connection.query('SELECT a.* FROM favorite f LEFT JOIN article a ON f.articleId = a.id WHERE f.userId = ? ORDER BY f.createTime DESC limit ?,6',
+      [userId, (currentPage-1)*6],
+      (err, data) => {
+        if(err) {
+          console.log(err)
+          reject(err)
+          return 
+        }
+        res.send({
+          likeData: data,
+          count: count[0]
+        })
+      })
+    
+  })
+})
+
 
 app.listen(3001,function () {    ////监听3000端口
     console.log('Server running at 3001 port');
