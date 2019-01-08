@@ -7,6 +7,9 @@ const session = require('express-session')
 
 const md5 = require('blueimp-md5')
 
+const path = require('path')
+
+
 // const jwt = require('jwt-simple')
 const jwt = require('jsonwebtoken')
 
@@ -20,7 +23,7 @@ const fs = require('fs')
 
 //引入multer模块
 const multer = require('multer')
-
+// var upload = multer({dest:'uploads/'});
 const NedbStore = require('nedb-session-store')( session );
 
 const sessionMiddleware = session({
@@ -42,10 +45,9 @@ const connection = require('./connection.js') //引入连接数据库模块
 const bodyParser = require('body-parser')
 
 
-
 app.use(sessionMiddleware);
 
-var upload = require('./routes/upload');
+// var upload = require('./routes/upload');
 const login = require('./routes/login')
 
 // 解析 application/json
@@ -67,10 +69,51 @@ app.all('*', function (req, res, next) {
   }
 });
 
-app.use('/upload', upload);
-
+app.use(express.static(path.join(__dirname, 'public')));
+// app.use('/upload', upload);
+// app.use(multer({dest:"./uploads"}).array("file"));
 
 connection.connect();
+// const formidable = require('formidable')
+// const uuid = require('uuid')
+// const mkdirs = require('mkdirs')
+
+const storage = multer.diskStorage({
+  // destination:'public/uploads/'+new Date().getFullYear() + (new Date().getMonth()+1) + new Date().getDate(),
+  destination(req,res,cb){
+    cb(null,'public/uploads/'+new Date().getFullYear() + (new Date().getMonth()+1) + new Date().getDate());
+  },
+  filename(req,file,cb){
+    const filenameArr = file.originalname.split('.');
+    cb(null,Date.now() + '-' + file.originalname.substring(0,file.originalname.indexOf('.')) + '.' + filenameArr[filenameArr.length-1]);
+  }
+});
+
+const upload = multer({storage});
+
+app.use(upload.array("file"));
+
+// app.post('/',upload.single('file'),(req,res)=>{
+//   console.log(req.body);
+//   console.log(req.file);
+//   res.send(req.file);
+// });
+
+app.post('/fileUpload',function(req, res) {
+  console.log(req.files);
+  fs.writeFile('./uploads', req.files, (err, data) => {
+    if(err) {
+      console.log('写入失败')
+      return
+    }
+    console.log('success')
+
+  })
+})
+
+
+
+
 
 
 // -----------登录---------------
@@ -934,7 +977,53 @@ app.post('/likeData', function(req, res) {
   })
 })
 
+// -------------updateNickname ----------------
+app.post('/updateNickname',function(req, res) {
+  new Promise((resolve, reject) => {
+    connection.query('SELECT count(id) as count FROM users where nickname = ? limit 1',
+    [req.body.nickname],(err, result) => {
+      if(err) {
+        console.log(err)
+        reject(err)
+        return
+      }
+      resolve(result[0].count)
+    })
+  })
+  .then( result => {
+    console.log(result)
+    if( result === 0) {
+      new Promise((resolve, reject) => {
+        connection.query('UPDATE users SET nickname = ? where id = ?',
+          [req.body.nickname,req.body.userId],(err, result) => {
+            if( err ) {
+              console.log(err)
+              reject(err)
+              return
+            }
+            resolve({code: 0,success: "更新成功"})
+          })
+      })
+      .then( resolve => {
+        console.log(resolve.code)
+        if( resolve.code === 0) {
+          connection.query('SELECT * FROM users WHERE id = ?',[req.body.userId],(err, result) => {
+            if(err) {
+              console.log(err)
+              return
+            }
+            resolve.user = result
+            res.send(resolve)
+          })
+        }
+      })
+    } else {
+      res.send({code: 1,error: "用户名已存在"})
+    }
+  })
+  
+})
 
-app.listen(3001,function () {    ////监听3000端口
+app.listen(3002,function () {    ////监听3000端口
     console.log('Server running at 3001 port');
 });

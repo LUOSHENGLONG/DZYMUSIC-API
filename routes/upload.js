@@ -37,10 +37,13 @@ var upload = multer({ storage: storage });
 /* POST upload listing. */
 router.post('/', upload.single('file'), function(req, res, next) {
     var file = req.file;
-    console.log('文件类型：%s', file.mimetype);
-    console.log('原始文件名：%s', file.originalname);
-    console.log('文件大小：%s', file.size);
-    console.log('文件保存路径：%s', file.path);
+    console.log('文件类型：%s', file);
+    console.log('文件类型：%s', req.body.formData);
+
+    // console.log('文件类型：%s', file.mimetype);
+    // console.log('原始文件名：%s', file.originalname);
+    // console.log('文件大小：%s', file.size);
+    // console.log('文件保存路径：%s', file.path);
     // 接收文件成功后返回数据给前端
     res.json({res_code: '0'});
 });
