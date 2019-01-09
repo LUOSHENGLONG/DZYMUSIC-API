@@ -9,6 +9,8 @@ const md5 = require('blueimp-md5')
 
 const path = require('path')
 
+const svgCaptcha = require('svg-captcha');
+
 
 // const jwt = require('jwt-simple')
 const jwt = require('jsonwebtoken')
@@ -44,6 +46,18 @@ const app = express();        //创建express的实例
 const connection = require('./connection.js') //引入连接数据库模块
 const bodyParser = require('body-parser')
 
+// 限制api请求次数
+const rateLimit = require("express-rate-limit");
+ 
+app.enable("trust proxy"); // only if you're behind a reverse proxy (Heroku, Bluemix, AWS ELB, Nginx, etc)
+ 
+const apiLimiter = rateLimit({
+  windowMs: 1 * 60 * 1000, // 15 minutes
+  max: 5
+});
+ 
+// only apply to requests that begin with /api/
+app.use("/login", apiLimiter);
 
 app.use(sessionMiddleware);
 
@@ -69,7 +83,7 @@ app.all('*', function (req, res, next) {
   }
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, './public/uploads/avatar')));
 // app.use('/upload', upload);
 // app.use(multer({dest:"./uploads"}).array("file"));
 
@@ -81,7 +95,7 @@ connection.connect();
 const storage = multer.diskStorage({
   // destination:'public/uploads/'+new Date().getFullYear() + (new Date().getMonth()+1) + new Date().getDate(),
   destination(req,res,cb){
-    cb(null,'public/uploads/'+new Date().getFullYear() + (new Date().getMonth()+1) + new Date().getDate());
+    cb(null,'public/uploads/avatar');
   },
   filename(req,file,cb){
     const filenameArr = file.originalname.split('.');
@@ -90,8 +104,10 @@ const storage = multer.diskStorage({
 });
 
 const upload = multer({storage});
-
-app.use(upload.array("file"));
+// 多文件上传
+// app.use(upload.array("file"));
+// 单文件上传
+// app.use(upload.single("file"));
 
 // app.post('/',upload.single('file'),(req,res)=>{
 //   console.log(req.body);
@@ -99,15 +115,42 @@ app.use(upload.array("file"));
 //   res.send(req.file);
 // });
 
-app.post('/fileUpload',function(req, res) {
-  console.log(req.files);
-  fs.writeFile('./uploads', req.files, (err, data) => {
-    if(err) {
-      console.log('写入失败')
+app.post('/fileUpload', upload.single("file"), function(req, res) {
+  let filePath = path.join(`./public/uploads/avatar/`+req.file.filename)
+  fs.readFile(filePath, (err, result) => {
+    if( err ) {
+      console.log(err)
       return
     }
-    console.log('success')
-
+    new Promise((resolve, reject) => {
+      connection.query('UPDATE users SET avatar = ? WHERE id = ?',
+        [`/`+req.file.filename, req.body.id], (err, result) => {
+          if( err ) {
+            return console.log(err)
+          }
+          // 更新头像成功 删除原头像文件
+          res.send({avatar: `/`+req.file.filename})
+          fs.unlink(path.join(`./public/uploads/avatar`+req.body.avatar),(err) => {
+            if(err) {
+              return console.log(err)
+            }
+            console.log("头像更新成功且已删除原头像文件")
+          })
+          console.log(result)
+        })
+    })
+    // console.log(new FileReader().readAsDataURL(result))
+    // console.log(result)
+    // let content = new Buffer(0)
+    // content = Buffer.concat([content, result])
+    // let imgData = new Buffer(content, 'base64')
+    // fs.writeFile(path.resolve('./public/logo.png'), imgData, (err, result) => {
+    //   if(err){
+    //     console.log(err)
+    //     return
+    //   }
+    //   console.log("save file success")
+    // })
   })
 })
 
@@ -119,6 +162,7 @@ app.post('/fileUpload',function(req, res) {
 // -----------登录---------------
 app.post('/login',function (req,res) {
   // console.log(req.session)
+  console.log("-----------------")
   let username = req.body.username
   let password = req.body.password
   const phoneConfirm = new RegExp("(^1[3,4,5,6,7,9,8][0-9]{9}$|14[0-9]{9}|15[0-9]{9}$|18[0-9]{9}$)")
@@ -849,13 +893,14 @@ app.post('/sendReply',function(req, res) {
   const content = req.body.content
   const fromUid = req.body.fromUid
   const fromNickname = req.body.fromNickname
+  const fromAvatar = req.body.fromAvatar
   const toUid = req.body.toUid
   const createTime = req.body.createTime
 
 
   new Promise((resolve,reject) => {
-    connection.query(`INSERT INTO replys VALUES(?,?,?,?,?,?,?,?,?)`,
-      [id, commentId, replyId, replyType, content, fromUid, fromNickname, toUid, createTime],
+    connection.query(`INSERT INTO replys VALUES(?,?,?,?,?,?,?,?,?,?)`,
+      [id, commentId, replyId, replyType, content, fromUid, fromNickname, fromAvatar, toUid, createTime],
       (err, result) => {
       if(err){
         console.log(err)
@@ -896,7 +941,7 @@ app.post('/getComment',function(req, res) {
   })
   .then(comments => {
     connection.query(
-      `SELECT r.comment_id,r.content,r.createTime,r.from_uid,r.fromNickname,r.reply_id,r.reply_type,r.to_uid,u.nickname,u.avatar FROM replys r LEFT JOIN users u ON r.to_uid = u.id WHERE r.comment_id = ? ORDER BY r.createTime DESC
+      `SELECT r.comment_id,r.content,r.createTime,r.from_uid,r.fromNickname,r.fromAvatar,r.reply_id,r.reply_type,r.to_uid,u.nickname,u.avatar FROM replys r LEFT JOIN users u ON r.to_uid = u.id WHERE r.comment_id = ? ORDER BY r.createTime DESC
       `,
       [id],
       (err, replys) => {
@@ -979,6 +1024,7 @@ app.post('/likeData', function(req, res) {
 
 // -------------updateNickname ----------------
 app.post('/updateNickname',function(req, res) {
+  // 查询昵称是否存在
   new Promise((resolve, reject) => {
     connection.query('SELECT count(id) as count FROM users where nickname = ? limit 1',
     [req.body.nickname],(err, result) => {
@@ -992,6 +1038,7 @@ app.post('/updateNickname',function(req, res) {
   })
   .then( result => {
     console.log(result)
+    // 查询昵称是否已存在 不存在result为 0 同时更新到数据库
     if( result === 0) {
       new Promise((resolve, reject) => {
         connection.query('UPDATE users SET nickname = ? where id = ?',
@@ -1006,24 +1053,40 @@ app.post('/updateNickname',function(req, res) {
       })
       .then( resolve => {
         console.log(resolve.code)
+        // 数据库更新成功同时查询数据库并返回结果
         if( resolve.code === 0) {
-          connection.query('SELECT * FROM users WHERE id = ?',[req.body.userId],(err, result) => {
-            if(err) {
-              console.log(err)
-              return
-            }
-            resolve.user = result
-            res.send(resolve)
-          })
+          // connection.query('SELECT * FROM users WHERE id = ?',[req.body.userId],(err, result) => {
+          //   if(err) {
+          //     console.log(err)
+          //     return
+          //   }
+          // })
+          // resolve.user = result
+          resolve.nickname = req.body.nickname
+          res.send(resolve)
         }
       })
     } else {
-      res.send({code: 1,error: "用户名已存在"})
+      res.send({code: 1,error: "已占用"})
     }
   })
   
 })
 
-app.listen(3002,function () {    ////监听3000端口
+// ---------------- getCAPTCHA ------------
+app.post('/getCAPTCHA', function(req, res) {
+  let codeConfig = {
+    size: 4, // 验证码长度
+    ignoreChars: '0o1i', // 验证码字符中排除0o1i
+    noise: 2, // 干扰线条的数量
+  }
+  const captcha = svgCaptcha.create(codeConfig);
+  console.log(captcha.text)
+  const text = md5(`music` + captcha.text.toLowerCase())
+  console.log(text)
+	res.type('svg');
+	res.status(200).send({text: text, data: captcha.data});
+})
+app.listen(3001,function () {    ////监听3000端口
     console.log('Server running at 3001 port');
 });
