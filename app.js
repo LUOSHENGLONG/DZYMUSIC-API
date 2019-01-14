@@ -17,6 +17,9 @@ const jwt = require('jsonwebtoken')
 
 const moment = require('moment')
 
+// 引入uuid
+const uuid = require('node-uuid');
+
 //引入mysql模块
 const mysql = require('mysql');
 
@@ -92,18 +95,18 @@ connection.connect();
 // const uuid = require('uuid')
 // const mkdirs = require('mkdirs')
 
-const storage = multer.diskStorage({
+let storage = multer.diskStorage({
   // destination:'public/uploads/'+new Date().getFullYear() + (new Date().getMonth()+1) + new Date().getDate(),
   destination(req,res,cb){
     cb(null,'public/uploads/avatar');
   },
   filename(req,file,cb){
-    const filenameArr = file.originalname.split('.');
-    cb(null,Date.now() + '-' + file.originalname.substring(0,file.originalname.indexOf('.')) + '.' + filenameArr[filenameArr.length-1]);
+    let filenameArr = file.originalname.split('.');
+    cb(null,Date.now() + '-' + uuid.v4() + file.originalname.substring(0,file.originalname.indexOf('.')) + '.' + filenameArr[filenameArr.length-1]);
   }
 });
 
-const upload = multer({storage});
+let upload = multer({storage});
 // 多文件上传
 // app.use(upload.array("file"));
 // 单文件上传
@@ -139,18 +142,6 @@ app.post('/fileUpload', upload.single("file"), function(req, res) {
           console.log(result)
         })
     })
-    // console.log(new FileReader().readAsDataURL(result))
-    // console.log(result)
-    // let content = new Buffer(0)
-    // content = Buffer.concat([content, result])
-    // let imgData = new Buffer(content, 'base64')
-    // fs.writeFile(path.resolve('./public/logo.png'), imgData, (err, result) => {
-    //   if(err){
-    //     console.log(err)
-    //     return
-    //   }
-    //   console.log("save file success")
-    // })
   })
 })
 
@@ -185,6 +176,8 @@ app.post('/login',function (req,res) {
   password = md5(password)
   //密码加密 第二次
   password = md5(password)
+
+  console.log("password:----" + password)
   
   
   new Promise((resolve, reject) => {
@@ -199,10 +192,20 @@ app.post('/login',function (req,res) {
         if(result.length > 0 ) {
           let content ={name:req.body.name}; // 要生成token的主题信息
           let secretOrPrivateKey="dzymusic" // 这是加密的key（密钥） 
-          let token = jwt.sign(content, secretOrPrivateKey, {
-                  expiresIn: 60*30*1               // 1小时过期
-              });
-              console.log(token)
+          let token = {}
+          if(req.body.toggle) {
+            token = jwt.sign(content, secretOrPrivateKey, {
+              expiresIn: 60*30*1*24*15                // 1小时过期
+            });
+          console.log("1hours")
+        }else {
+            token = jwt.sign(content, secretOrPrivateKey, {
+              expiresIn: 60*30*1              // 1小时过期
+            });
+          console.log("24*15hours")
+        }
+         
+          console.log(token)
           result[0].token = token    //token写入数据库    
 
           connection.query(
@@ -245,20 +248,34 @@ app.post('/login',function (req,res) {
 // -----------登录验证---------------
 app.post('/confirmLogin',(req, res) => {
   let token = req.body.token
+  // 验证token 是否失效
   jwt.verify(token, 'dzymusic', (error, decoded) => {
+    // token失效
     if (error) {
-      console.log(error.message)
-      console.log(111111111111111)
       res.send({
         isLogin: false
       })
       return
     }
-    console.log(222222222222222)
-    console.log(decoded)
-    res.send({
-      isLogin: true
+    // token 有效
+    new Promise((resolve, reject) => {
+      connection.query('SELECT * FROM users WHERE token = ?',[token],(err, result) => {
+        if (err) return console.log(err)
+        if( result.length > 0 ) {
+          res.send({
+            isLogin: true,
+            user: result[0]
+          })
+          console.log("sssssssssssssss")
+        }else {
+          res.send({
+            isLogin: false
+          })
+        }
+      })
     })
+
+    
   })
 })
 
@@ -350,7 +367,7 @@ app.post('/register',function (req,res) {
     };
     const selectSql = ``
     connection.query(`INSERT users(id,user_id,`+sqlName+`,PASSWORD,nickname,createTime) VALUES(?,?,?,?,?,?)`,
-      [randomWord(true,18,20),nickname,username,password,nickname,formatDateTime()], 
+      [uuid.v4(),nickname,username,password,nickname,formatDateTime()], 
       (err, result) => {
         if(err){
           console.log("注册出错")
@@ -1087,6 +1104,106 @@ app.post('/getCAPTCHA', function(req, res) {
 	res.type('svg');
 	res.status(200).send({text: text, data: captcha.data});
 })
+
+// ------------------ 获取用户投稿 ---------
+app.post('/getMyContribute', function(req, res) {
+  console.log("resultresu=========ltresult")
+  console.log(req.body.userId)
+  connection.query('SELECT * FROM contribute where userId = ?  ORDER BY contributeTime DESC',[req.body.userId],(err, result) => {
+    if(err) {
+      console.log(err)
+      return 
+    }
+    res.send(result)
+  })
+  
+})
+
+// ------------------ 删除用户投稿 ---------
+app.post('/deleteMyContribute', function(req, res) {
+  console.log("resultresu=========ltresult")
+  console.log(req.body.userId)
+  connection.query('DELETE FROM contribute WHERE id = ?',[req.body.id],(err, result) => {
+    if(err) {
+      console.log(err)
+      return 
+    }
+    res.send(result)
+  })
+  
+})
+
+app.post('/getContribute', function(req, res) {
+  connection.query("SELECT * FROM contribute ORDER BY contributeTime DESC",(err, result) => {
+    if(err) {
+      console.log(err)
+      return err
+    }
+    console.log(result[0])
+  })
+})
+
+
+
+
+
+// ------------- submitContribute ---------------
+
+storage = multer.diskStorage({
+  // destination:'public/uploads/'+new Date().getFullYear() + (new Date().getMonth()+1) + new Date().getDate(),
+  destination(req,res,cb){
+    cb(null,'public/uploads/contribute');
+  },
+  filename(req,file,cb){
+    let filenameArr = file.originalname.split('.');
+    cb(null,Date.now() + '-' + uuid.v4() + file.originalname.substring(0,file.originalname.indexOf('.')) + '.' + filenameArr[filenameArr.length-1]);
+  }
+});
+
+upload = multer({storage});
+// 提交投稿
+app.post('/submitContribute', upload.array("file"), function(req, res) {
+  console.log(req.files)
+  let imgSrc = []
+  req.files.forEach( file => {
+    imgSrc.push('/contribute' + file.filename)
+  })
+  console.log(req.body.title)
+  console.log(imgSrc)
+  if( imgSrc.length > 0) {
+    imgSrc = JSON.stringify(imgSrc)
+  } else {
+    imgSrc = null
+  }
+  
+  const id = uuid.v4()
+  const userId = req.body.userId 
+  const title = req.body.title 
+  const type = req.body.type 
+  const content = req.body.content 
+  const description = req.body.description 
+  const videoLink = req.body.videoLink 
+  const downloadLink = req.body.downloadLink 
+  const downloadPassword = req.body.downloadPassword 
+  const downloadUnzip = req.body.downloadUnzip 
+  // const isRealease = req.body.isRealease 
+  // const contributeTime = req.body.contributeTime 
+  const contributeTime = new Date().getTime()
+  new Promise((resolve, reject) => {
+    connection.query('INSERT INTO contribute VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      [id,userId,title,type,content,description,videoLink,imgSrc,downloadLink,downloadPassword,downloadUnzip,0,contributeTime],
+      (err, result) => {
+        if(err) return console.log(err)
+        console.log(result)
+        res.send(result)
+      }
+    )
+  })
+})
+
+
+
 app.listen(3001,function () {    ////监听3000端口
     console.log('Server running at 3001 port');
+     
 });
