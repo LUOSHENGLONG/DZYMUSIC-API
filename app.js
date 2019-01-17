@@ -86,7 +86,7 @@ app.all('*', function (req, res, next) {
   }
 });
 
-app.use(express.static(path.join(__dirname, './public/uploads/avatar')));
+app.use(express.static(path.join(__dirname, './public/uploads')));
 // app.use('/upload', upload);
 // app.use(multer({dest:"./uploads"}).array("file"));
 
@@ -127,7 +127,7 @@ app.post('/fileUpload', upload.single("file"), function(req, res) {
     }
     new Promise((resolve, reject) => {
       connection.query('UPDATE users SET avatar = ? WHERE id = ?',
-        [`/`+req.file.filename, req.body.id], (err, result) => {
+        [`/avatar/`+req.file.filename, req.body.id], (err, result) => {
           if( err ) {
             return console.log(err)
           }
@@ -1109,12 +1109,19 @@ app.post('/getCAPTCHA', function(req, res) {
 app.post('/getMyContribute', function(req, res) {
   console.log("resultresu=========ltresult")
   console.log(req.body.userId)
-  connection.query('SELECT * FROM contribute where userId = ?  ORDER BY contributeTime DESC',[req.body.userId],(err, result) => {
+  connection.query('SELECT COUNT(id) as count FROM contribute where userId = ?', [req.body.userId], (err, count) => {
     if(err) {
       console.log(err)
       return 
     }
-    res.send(result)
+    connection.query('SELECT * FROM contribute where userId = ? ORDER BY contributeTime DESC limit ?,10',[req.body.userId,(req.body.currentPage-1)*10], (err, pageData) => {
+      if(err) {
+        console.log(err)
+        return 
+      }
+
+      res.send({count,pageData})
+    } )
   })
   
 })
@@ -1133,15 +1140,98 @@ app.post('/deleteMyContribute', function(req, res) {
   
 })
 
+// app.post('/getContribute', function(req, res) {
+//   connection.query("SELECT * FROM contribute ORDER BY contributeTime DESC",(err, result) => {
+//     if(err) {
+//       console.log(err)
+//       return err
+//     }
+//     console.log(result[0])
+//     res.send({result})
+//   })
+// })
+// ------------- 获取投稿 ----------------
 app.post('/getContribute', function(req, res) {
-  connection.query("SELECT * FROM contribute ORDER BY contributeTime DESC",(err, result) => {
+  connection.query('SELECT COUNT(id) as count FROM contribute', (err, count) => {
     if(err) {
       console.log(err)
-      return err
+      return 
     }
-    console.log(result[0])
+    connection.query('SELECT * FROM contribute ORDER BY contributeTime DESC limit ?,10',[(req.body.currentPage-1)*10], (err, pageData) => {
+      if(err) {
+        console.log(err)
+        return 
+      }
+
+      res.send({count,pageData})
+    } )
   })
+  
 })
+
+// ------------- 批量驳回投稿 ----------------
+app.post('/batchReject', function(req, res) {
+  console.log(req.body.batchId)
+  
+  connection.query('UPDATE contribute SET isRelease = -1  WHERE id in (?)',[req.body.batchId], (err, result) => {
+    if(err) {
+      console.log(err)
+      return 
+    }
+    // res.send({message: "批量驳回投稿成功"})
+  })
+  
+})
+
+
+// ------------- 批量发布投稿 ----------------
+app.post('/batchRelease', function(req, res) {
+  connection.query('UPDATE contribute SET isRelease = 1  WHERE id in (?)',[req.body.batchId], (err, result) => {
+    if(err) {
+      console.log(err)
+      return 
+    }
+    // res.send({message: "批量发布投稿成功"})
+  })
+  
+})
+
+// ------------- 发布所有投稿 ----------------
+app.post('/allRelease', function(req, res) {
+  connection.query('UPDATE contribute SET isRelease = 1  WHERE isRelease = 0', (err, result) => {
+    if(err) {
+      console.log(err)
+      return 
+    }
+    // res.send({message: "发布所有投稿成功"})
+  })
+  
+})
+
+// ------------- 驳回所有投稿 ----------------
+app.post('/allReject', function(req, res) {
+  connection.query('UPDATE contribute SET isRelease = -1  WHERE isRelease = 0', (err, result) => {
+    if(err) {
+      console.log(err)
+      return 
+    }
+    // res.send({message: "发布所有投稿成功"})
+  })
+  
+})
+
+// ------------- 根据投稿ID 获取 ----------------
+app.post('/getArticleById', function(req, res) {
+  connection.query('SELECT * FROM contribute WHERE id = ? limit 1', [req.body.id], (err, Article) => {
+    if(err) {
+      console.log(err)
+      return 
+    }
+    res.send({Article})
+  })
+  
+})
+
 
 
 
@@ -1166,7 +1256,7 @@ app.post('/submitContribute', upload.array("file"), function(req, res) {
   console.log(req.files)
   let imgSrc = []
   req.files.forEach( file => {
-    imgSrc.push('/contribute' + file.filename)
+    imgSrc.push('/contribute/' + file.filename)
   })
   console.log(req.body.title)
   console.log(imgSrc)
@@ -1186,7 +1276,7 @@ app.post('/submitContribute', upload.array("file"), function(req, res) {
   const downloadLink = req.body.downloadLink 
   const downloadPassword = req.body.downloadPassword 
   const downloadUnzip = req.body.downloadUnzip 
-  // const isRealease = req.body.isRealease 
+  // const isRelease = req.body.isRelease 
   // const contributeTime = req.body.contributeTime 
   const contributeTime = new Date().getTime()
   new Promise((resolve, reject) => {
