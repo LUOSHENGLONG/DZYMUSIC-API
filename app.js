@@ -132,7 +132,7 @@ app.post('/fileUpload', upload.single("file"), function(req, res) {
             return console.log(err)
           }
           // 更新头像成功 删除原头像文件
-          res.send({avatar: `/`+req.file.filename})
+          res.send({avatar: `/avatar/`+req.file.filename})
           fs.unlink(path.join(`./public/uploads/avatar`+req.body.avatar),(err) => {
             if(err) {
               return console.log(err)
@@ -1128,8 +1128,7 @@ app.post('/getMyContribute', function(req, res) {
 
 // ------------------ 删除用户投稿 ---------
 app.post('/deleteMyContribute', function(req, res) {
-  console.log("resultresu=========ltresult")
-  console.log(req.body.userId)
+  console.log(req.body.id)
   connection.query('DELETE FROM contribute WHERE id = ?',[req.body.id],(err, result) => {
     if(err) {
       console.log(err)
@@ -1233,6 +1232,39 @@ app.post('/getArticleById', function(req, res) {
 })
 
 
+// --------------发布投稿 ------------------
+app.post('/releaseSingleArticle', function(req, res) {
+  let article  = req.body.article
+  const id = article.id
+  const title = article.title
+  const type = article.type
+  const img = article.img
+  const content = article.content
+  const description = article.description
+  const videoLink = article.videoLink
+  const downloadLink = article.downloadLink
+  const downloadPassword = article.downloadPassword
+  const downloadUnzip = article.downloadUnzip
+  const issuer = article.userId
+  const size = article.size
+  const releaseTime = new Date().getTime()
+  connection.query('INSERT INTO article VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)', 
+  [id,title,type,content,description,videoLink,downloadLink,size,downloadPassword,downloadUnzip,0,0,issuer,releaseTime,img], (err, Article) => {
+    if(err) {
+      console.log(err)
+      return 
+    }
+    connection.query('UPDATE contribute SET isRelease = 1  WHERE id = ?', [id], (err, result) => {
+      if(err) {
+        console.log(err)
+        return 
+      }
+    })
+  })
+
+
+})
+
 
 
 
@@ -1276,12 +1308,13 @@ app.post('/submitContribute', upload.array("file"), function(req, res) {
   const downloadLink = req.body.downloadLink 
   const downloadPassword = req.body.downloadPassword 
   const downloadUnzip = req.body.downloadUnzip 
+  const size = req.body.size 
   // const isRelease = req.body.isRelease 
   // const contributeTime = req.body.contributeTime 
   const contributeTime = new Date().getTime()
   new Promise((resolve, reject) => {
-    connection.query('INSERT INTO contribute VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?)',
-      [id,userId,title,type,content,description,videoLink,imgSrc,downloadLink,downloadPassword,downloadUnzip,0,contributeTime],
+    connection.query('INSERT INTO contribute VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)',
+      [id,userId,title,type,content,description,videoLink,imgSrc,downloadLink,size,downloadPassword,downloadUnzip,0,contributeTime],
       (err, result) => {
         if(err) return console.log(err)
         console.log(result)
