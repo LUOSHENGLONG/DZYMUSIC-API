@@ -14,6 +14,7 @@
     "express-session": "^1.15.6",
     "jsonwebtoken": "^8.4.0",
     "nedb-session-store": "^1.1.2",
+    "nodemailer": "^5.1.1",
     "parameter": "^3.5.0",
     "uid-safe": "^2.1.5"
   }

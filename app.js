@@ -10,7 +10,8 @@ const md5 = require('blueimp-md5')
 const path = require('path')
 
 const svgCaptcha = require('svg-captcha');
-
+// 发送邮件模块
+const nodemailer = require('nodemailer');
 
 // const jwt = require('jwt-simple')
 const jwt = require('jsonwebtoken')
@@ -67,6 +68,7 @@ app.use(sessionMiddleware);
 // var upload = require('./routes/upload');
 const login = require('./routes/login')
 
+
 // 解析 application/json
 app.use(bodyParser.json()); 
 // 解析 application/x-www-form-urlencoded
@@ -85,6 +87,25 @@ app.all('*', function (req, res, next) {
       next();
   }
 });
+
+
+// -----------------发送邮件配置 -----------------
+let transporter = nodemailer.createTransport({
+  // host: 'smtp.ethereal.email',
+  service: 'qq', // 使用了内置传输发送邮件 查看支持列表：https://nodemailer.com/smtp/well-known/
+  port: 465, // SMTP 端口
+  secureConnection: true, // 使用了 SSL
+  auth: {
+    user: 'music1788@qq.com',
+    // 这里密码不是qq密码，是你设置的smtp授权码
+    pass: 'pvilpkuuwbcyehdd',
+  }
+});
+
+
+
+
+
 
 app.use(express.static(path.join(__dirname, './public/uploads')));
 // app.use('/upload', upload);
@@ -391,172 +412,48 @@ app.post('/register',function (req,res) {
 
 });
 
-// ------------synthesizer---------------
-app.post('/synth',function(req, res) {
-  console.log(req.body)
-  new Promise((resolve,reject) => {
-    connection.query('SELECT count(id) FROM article where type = "synthesizer"',(err, result) => {
-      if(err){
-        console.log(err)
-        reject(err)
-        return
-      }
-      resolve(result[0])
+
+
+app.post('/classify', (req, res) => {
+  let type = req.body.type
+  let currentPage = req.body.currentPage
+  function getData(type, currentPage) {
+    console.log(type)
+    console.log(currentPage)
+    new Promise((resolve,reject) => {
+      connection.query('SELECT count(id) FROM article where type = ?', [type], (err, result) => {
+        if(err){
+          console.log(err)
+          reject(err)
+          return
+        }
+        resolve(result[0])
+      })
+    }).then((count) => {
+      connection.query(`SELECT a.*,u.nickname as nickname FROM article a LEFT JOIN users u ON a.issuer = u.id where a.type = ? ORDER BY a.releaseTime desc limit ?,?`,
+      [type,(currentPage-1)*10,9],
+      (err, result) => {
+        if(err){
+          console.log(err)
+          return
+        }
+        if(result.length > 0) {
+          res.send({
+            count: count,
+            data: result
+          })
+        }
+      })
+    }).catch(err => {
+      console.log(err)
     })
-  }).then((count) => {
-    connection.query(`SELECT id,type,title,content,look,issuer,releaseTime,img FROM article where type = "synthesizer" ORDER BY releaseTime,id desc limit ?,?`,
-    [(req.body.currentPage-1)*10,9],
-    (err, result) => {
-      if(err){
-        console.log(err)
-        reject(err)
-        return
-      }
-      if(result.length > 0) {
-        res.send({
-          count: count,
-          data: result
-        })
-      }
-    })
-  }).catch(err => {
-    console.log(err)
-  })
+  }
+  getData(type, currentPage)
 })
 
-// ------------effects---------------
-app.post('/effects',function(req, res) {
-  console.log(req.body)
-  new Promise((resolve,reject) => {
-    connection.query('SELECT count(id) FROM article where type = "effects"',(err, result) => {
-      if(err){
-        console.log(err)
-        reject(err)
-        return
-      }
-      resolve(result[0])
-    })
-  }).then((count) => {
-    connection.query(`SELECT id,type,title,content,look,issuer,releaseTime,img FROM article where type = "effects" ORDER BY releaseTime,id desc limit ?,?`,
-    [(req.body.currentPage-1)*10,9],
-    (err, result) => {
-      if(err){
-        console.log(err)
-        reject(err)
-        return
-      }
-      if(result.length > 0) {
-        res.send({
-          count: count,
-          data: result
-        })
-      }
-    })
-  }).catch(err => {
-    console.log(err)
-  })
-})
 
-// ------------samplePack---------------
-app.post('/samplePack',function(req, res) {
-  console.log(req.body)
-  new Promise((resolve,reject) => {
-    connection.query('SELECT count(id) FROM article where type = "samplePack"',(err, result) => {
-      if(err){
-        console.log(err)
-        reject(err)
-        return
-      }
-      resolve(result[0])
-    })
-  }).then((count) => {
-    connection.query(`SELECT id,type,title,content,look,issuer,releaseTime,img FROM article where type = "samplePack" ORDER BY releaseTime,id desc limit ?,?`,
-    [(req.body.currentPage-1)*10,9],
-    (err, result) => {
-      if(err){
-        console.log(err)
-        reject(err)
-        return
-      }
-      if(result.length > 0) {
-        res.send({
-          count: count,
-          data: result
-        })
-      }
-    })
-  }).catch(err => {
-    console.log(err)
-  })
-})
 
-// ------------tutorial---------------
-app.post('/tutorial',function(req, res) {
-  console.log(req.body)
-  new Promise((resolve,reject) => {
-    connection.query('SELECT count(id) FROM article where type = "tutorial"',(err, result) => {
-      if(err){
-        console.log(err)
-        reject(err)
-        return
-      }
-      resolve(result[0])
-    })
-  }).then((count) => {
-    connection.query(`SELECT id,type,title,content,look,issuer,releaseTime,img FROM article where type = "tutorial" ORDER BY releaseTime,id desc limit ?,?`,
-    [(req.body.currentPage-1)*10,9],
-    (err, result) => {
-      if(err){
-        console.log(err)
-        reject(err)
-        return
-      }
-      if(result.length > 0) {
-        res.send({
-          count: count,
-          data: result
-        })
-      }
-    })
-  }).catch(err => {
-    console.log(err)
-  })
-})
-
-// ------------host---------------
-app.post('/host',function(req, res) {
-  console.log(req.body)
-  new Promise((resolve,reject) => {
-    connection.query('SELECT count(id) FROM article where type = "host"',(err, result) => {
-      if(err){
-        console.log(err)
-        reject(err)
-        return
-      }
-      resolve(result[0])
-    })
-  }).then((count) => {
-    connection.query(`SELECT id,type,title,content,look,issuer,releaseTime,img FROM article where type = "host" ORDER BY releaseTime,id desc limit ?,?`,
-    [(req.body.currentPage-1)*10,9],
-    (err, result) => {
-      if(err){
-        console.log(err)
-        reject(err)
-        return
-      }
-      if(result.length > 0) {
-        res.send({
-          count: count,
-          data: result
-        })
-      }
-    })
-  }).catch(err => {
-    console.log(err)
-  })
-})
-
-// ------------effects---------------
+// ------------last---------------
 app.post('/last',function(req, res) {
   console.log(req.body)
   new Promise((resolve,reject) => {
@@ -569,7 +466,7 @@ app.post('/last',function(req, res) {
       resolve(result[0])
     })
   }).then((count) => {
-    connection.query(`SELECT id,type,title,content,look,issuer,releaseTime,img FROM article ORDER BY releaseTime,id desc limit ?,?`,
+    connection.query(`SELECT id,type,title,content,look,issuer,releaseTime,img FROM article ORDER BY releaseTime desc limit ?,?`,
     [(req.body.currentPage-1)*10,9],
     (err, result) => {
       if(err){
@@ -593,7 +490,7 @@ app.post('/last',function(req, res) {
 app.post('/info',function(req, res) {
   console.log(req.body)
   new Promise((resolve,reject) => {
-    connection.query(`SELECT * FROM article where id = ?`,[req.body.id],(err, result) => {
+    connection.query(`SELECT a.*,u.nickname as nickname FROM article a LEFT JOIN users u ON a.issuer = u.id WHERE a.id = ?`,[req.body.id],(err, result) => {
       if(err){
         console.log(err)
         reject(err)
@@ -627,7 +524,7 @@ app.post('/search',function(req, res) {
       resolve(result[0])
     })
   }).then((count) => {
-    connection.query(`SELECT id,type,title,content,look,issuer,releaseTime,img FROM article where title like ? ORDER BY releaseTime,id desc limit ?,?`,
+    connection.query(`SELECT id,type,title,content,look,issuer,releaseTime,img FROM article where title like ? ORDER BY releaseTime desc limit ?,?`,
     [keyword, (req.body.currentPage-1)*10,9],
     (err, result) => {
       if(err){
@@ -656,7 +553,7 @@ app.post('/search',function(req, res) {
 app.post('/rightData1',function(req, res) {
   console.log(req.body)
   new Promise((resolve,reject) => {
-    connection.query(`SELECT id,title,type FROM article order by releaseTime,id desc limit 0,9`,(err, result) => {
+    connection.query(`SELECT id,title,type FROM article order by releaseTime desc limit 0,9`,(err, result) => {
       if(err){
         console.log(err)
         reject(err)
@@ -680,7 +577,7 @@ app.post('/rightData1',function(req, res) {
 app.post('/rightData2',function(req, res) {
   console.log(req.body)
   new Promise((resolve,reject) => {
-    connection.query(`SELECT id,title,type FROM article order by "like",id desc limit 0,9`,(err, result) => {
+    connection.query(`SELECT id,title,type FROM article order by "like" desc limit 0,9`,(err, result) => {
       if(err){
         console.log(err)
         reject(err)
@@ -740,7 +637,7 @@ app.post('/homeData',function(req, res) {
 
 function getHomeData(type){
   return new Promise((resolve,reject) => {
-    connection.query(`SELECT id,title,content,img,releaseTime,type FROM article where type = "${type}" order by releaseTime,id desc limit 0,10`,(err, type) => {
+    connection.query(`SELECT id,title,content,img,releaseTime,type FROM article where type = "${type}" order by releaseTime desc limit 0,10`,(err, type) => {
       if(err){
         console.log(err)
         reject(err)
@@ -1324,8 +1221,208 @@ app.post('/submitContribute', upload.array("file"), function(req, res) {
   })
 })
 
+// 查询密保问题
+app.post("/getQuestion",(req, res) => {
+  connection.query('SELECT * FROM encrypted',
+    (err, result) => {
+      if(err) return console.log(err)
+      res.send(result)
+    }
+  )
+})
+
+// 设置密保问题
+app.post("/settingProtect",(req, res) => {
+  connection.query('INSERT INTO safe VALUES(?,?,?,?)',
+    [uuid.v4(),req.body.userId,req.body.question,md5(req.body.answer)],
+    (err, result) => {
+      if(err) return console.log(err)
+      res.send({code: 1 ,message: "设置密保成功"})
+    }
+  )
+})
+// 查询是否设置密保
+app.post("/getProtect",(req, res) => {
+  connection.query('SELECT count(id) as count FROM safe WHERE userId = ? limit 1',
+    [req.body.userId],
+    (err, result) => {
+      if(err) return console.log(err)
+      result = result[0]
+      res.send({count: result})
+    }
+  )
+})
+
+// 验证密保
+app.post("/verifyProtect",(req, res) => {
+  connection.query('SELECT count(id) as count FROM safe WHERE userId = ? and question = ? and answer = ? limit 1',
+  [req.body.userId,req.body.question,md5(req.body.answer)],
+    (err, result) => {
+      if(err) {
+        res.send({count: result})
+        console.log(err)
+        return
+      }
+      result = result[0]
+      console.log(result)
+      res.send({count: result})
+
+    }
+  )
+})
+
+// 更新密保
+app.post("/updataProtect",(req, res) => {
+  connection.query('UPDATE safe SET question = ? , answer = ? where userId = ?',
+  [req.body.question,md5(req.body.answer),req.body.userId],
+    (err, result) => {
+      if(err) return console.log(err)
+      result = result.affectedRows
+      res.send({count: result})
+
+    }
+  )
+})
+
+// 通过邮箱找回密码
+app.post("/findPasswordByEmail",(req, res) => {
+  const emailOrPhone = req.body.emailOrPhone
+  const account = req.body.account
+  const question = req.body.question
+  const answer = req.body.answer
+  connection.query(`SELECT id  FROM users WHERE email = ? limit 1`,
+  [account],
+    (err, result) => {
+      if(err) {
+        res.send({code: 0, message:"服务器错误"})
+        console.log(err)
+        return
+      }
+      if(result.length < 1) {
+        res.send({code: 0, message:"验证失败"})
+      } else {
+        let id = result[0].id
+        connection.query('SELECT * FROM safe WHERE userId = ? and question = ? and answer = ? limit 1',
+        [id, question, md5(answer)],
+        (err, count) => {
+          if(err) {
+            res.send({code: 0, message:"服务器错误"})
+            console.log(err)
+            return
+          }
+          console.log(question)
+          console.log(md5(answer))
+          if(count.length < 1) {
+            res.send({code: 0, message:"验证失败"})
+          } else {
+            res.send({code: 1, message:"验证成功"})
+          }
+        })
+      }
+    }
+  )
+})
 
 
+
+app.post("/sendEmail",(req, res) => {
+  // 发送到的邮箱地址
+  let email = req.body.email
+
+  connection.query(`SELECT * FROM users WHERE email = ? limit 1`,[email],(err, result) => {
+    if(err) {
+      res.send({code: 0,message: "邮箱不存在"})
+      console.log(err)
+      return
+    }
+    console.log(result)
+    if( result.length > 0) {
+      // 发送验证码生成
+      let codeConfig = {
+        size: 6, // 验证码长度
+        ignoreChars: 'QWERTYUIOPLKJHGFDSAZXCVBNMzxcvbnmlkjhgfdsaqwertyuiop', // 验证码字符中排除0o1i
+        noise: 2, // 干扰线条的数量
+      }
+      const captcha = svgCaptcha.create(codeConfig);
+      // text是验证码
+      const text = captcha.text.toLowerCase()
+      console.log(text)
+
+      let mailOptions = {
+        from: '"1788MUSIC" <music1788@qq.com>', // sender address
+        to: email, // list of receivers
+        subject: '1788MUSIC 验证码', // Subject line
+        // 发送text或者html格式
+        // text: 'Hello world?', // plain text body
+        html: `<div style="text-align: center;font-size:20px">你的验证码是<h1 style="display: inline-block;color: #6495ED;">${text}</h1></div>` // html body
+      };
+      
+      // send mail with defined transport object
+      transporter.sendMail(mailOptions, (error, info) => {
+        if (error) {
+          return console.log(error);
+        }
+        console.log('Message sent: %s', info.messageId);
+        // Message sent: <04ec7731-cc68-1ef6-303c-61b0f796b78f@qq.com>
+      });
+      res.send({code: 1,message: "验证码已发送",captcha: md5(md5(text))})
+    } else {
+      res.send({code: 0,message: "邮箱不存在"})
+    }
+  })
+})
+
+
+// 更新密码
+app.post("/updatePassword",(req, res) => {
+  const emailOrPhone = req.body.emailOrPhone
+  const account = req.body.account
+  let password = req.body.password
+  password = md5(password)
+  password = md5(password)
+  connection.query(`UPDATE users SET password = ? WHERE ${emailOrPhone} = ? limit 1`,
+  [password, account],
+    (err, result) => {
+      if(err) {
+        res.send({code: 0, message:"服务器错误"})
+        console.log(err)
+        return
+      }
+      console.log(result.affectedRows)
+      if(result.affectedRows > 0) {
+        res.send({code: 1, message: "修改成功"})
+      } else {
+        res.send({code: 0, message: "修改失败"})
+      }
+    }
+  )
+})
+
+// 订阅者
+app.post("/subscription",(req, res) => {
+  const email = req.body
+  connection.query("SELECT * FROM subscription WHERE email = ? limit 1",[eamil],(err,result) => {
+    if(err) {
+      res.send({code: 0,message: "服务器出错,订阅失败"})
+      console.log(err)
+      return
+    }
+    if(result.length > 0) {
+      connection.query("INSERT INTO subscription Values(?,?)",[uuid.v4(),eamil],(err,data) => {
+        if(err) {
+          res.send({code: 0,message: "服务器出错,订阅失败"})
+          console.log(err)
+          return
+        }
+        res.send({code: 1,message: "订阅成功"})
+
+      })
+    }
+  })
+})
+
+
+//dac27c8e7534098909bb93af3eb
 app.listen(3001,function () {    ////监听3000端口
     console.log('Server running at 3001 port');
      
