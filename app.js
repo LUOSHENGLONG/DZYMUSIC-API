@@ -430,8 +430,8 @@ app.post('/classify', (req, res) => {
         resolve(result[0])
       })
     }).then((count) => {
-      connection.query(`SELECT a.*,u.nickname as nickname FROM article a LEFT JOIN users u ON a.issuer = u.id where a.type = ? ORDER BY a.releaseTime desc limit ?,?`,
-      [type,(currentPage-1)*10,9],
+      connection.query(`SELECT a.content,a.img,a.type,a.description,a.id,a.size,a.releaseTime,a.title,u.nickname as nickname FROM article a LEFT JOIN users u ON a.issuer = u.id where a.type = ? ORDER BY a.releaseTime desc limit ?,?`,
+      [type,(currentPage-1)*10,10],
       (err, result) => {
         if(err){
           console.log(err)
@@ -466,12 +466,11 @@ app.post('/last',function(req, res) {
       resolve(result[0])
     })
   }).then((count) => {
-    connection.query(`SELECT id,type,title,content,look,issuer,releaseTime,img FROM article ORDER BY releaseTime desc limit ?,?`,
-    [(req.body.currentPage-1)*10,9],
+    connection.query(`SELECT a.*,u.nickname as nickname FROM article a LEFT JOIN users u ON a.issuer = u.id ORDER BY releaseTime desc limit ?,?`,
+    [(req.body.currentPage-1)*10,10],
     (err, result) => {
       if(err){
         console.log(err)
-        reject(err)
         return
       }
       if(result.length > 0) {
@@ -510,7 +509,7 @@ app.post('/info',function(req, res) {
   })
 })
 
-// ------------search---------------
+// ------------search----------SELECT a.content,a.img,a.type,a.description,a.id,a.size,a.releaseTime,a.title,u.nickname as nickname FROM article a LEFT JOIN users u ON a.issuer = u.id where a.type = ? ORDER BY a.releaseTime desc limit ?,?-----
 app.post('/search',function(req, res) {
   console.log(req.body)
   const keyword = `%` + req.body.keyword + `%`
@@ -524,12 +523,12 @@ app.post('/search',function(req, res) {
       resolve(result[0])
     })
   }).then((count) => {
-    connection.query(`SELECT id,type,title,content,look,issuer,releaseTime,img FROM article where title like ? ORDER BY releaseTime desc limit ?,?`,
-    [keyword, (req.body.currentPage-1)*10,9],
+    connection.query(
+    `SELECT a.content,a.img,a.type,a.description,a.id,a.size,a.releaseTime,a.title,u.nickname as nickname FROM article a LEFT JOIN users u ON a.issuer = u.id where a.title like ? ORDER BY a.releaseTime desc limit ?,?`,
+    [keyword, (req.body.currentPage-1)*10,10],
     (err, result) => {
       if(err){
         console.log(err)
-        reject(err)
         return
       }
       if(result.length > 0) {
@@ -553,7 +552,7 @@ app.post('/search',function(req, res) {
 app.post('/rightData1',function(req, res) {
   console.log(req.body)
   new Promise((resolve,reject) => {
-    connection.query(`SELECT id,title,type FROM article order by releaseTime desc limit 0,9`,(err, result) => {
+    connection.query(`SELECT id,title,type FROM article order by releaseTime desc limit 0,10`,(err, result) => {
       if(err){
         console.log(err)
         reject(err)
@@ -577,7 +576,7 @@ app.post('/rightData1',function(req, res) {
 app.post('/rightData2',function(req, res) {
   console.log(req.body)
   new Promise((resolve,reject) => {
-    connection.query(`SELECT id,title,type FROM article order by "like" desc limit 0,9`,(err, result) => {
+    connection.query(`SELECT id,title,type FROM article order by "like" desc limit 0,10`,(err, result) => {
       if(err){
         console.log(err)
         reject(err)
@@ -601,37 +600,53 @@ app.post('/rightData2',function(req, res) {
 app.post('/homeData',function(req, res) {
   let homeData = []
   console.log(req.body)
+  // 0
   getHomeData("synthesizer")
   .then(synthesizer => {
     homeData.push(synthesizer)
-    
   })
-
+  // 1
   getHomeData("effects")
   .then(effects => {
     homeData.push(effects)
   })
-
+  // 2
   getHomeData("samplePack")
   .then(samplePack => {
     homeData.push(samplePack)
   })
-
+  // 3
   getHomeData("tutorial")
   .then(tutorial => {
     homeData.push(tutorial)
   })
-
+  // 4
   getHomeData("host")
   .then(host => {
     homeData.push(host) 
-    res.send({
-      data: homeData
-    })
   })
-  
-  
-  
+  // 5
+  getHomeData("project")
+  .then(project => {
+    homeData.push(project) 
+  })
+  // 6
+  getHomeData("kontakt")
+  .then(kontakt => {
+    homeData.push(kontakt) 
+  })
+  // 7
+  getHomeData("preset")
+  .then(preset => {
+    homeData.push(preset) 
+  })
+  // 8
+  getHomeData("midi")
+  .then(midi => {
+    homeData.push(midi)
+    console.log(11111111111)
+    res.send({data: homeData})
+  })
 
 })
 
@@ -644,7 +659,6 @@ function getHomeData(type){
         return
       }
       resolve(type)
-      
     })
   })
 }
@@ -653,10 +667,6 @@ function getHomeData(type){
 app.post('/avatar',function(req, res) {
   const userId = req.body.userId
   const blob = req.body.blob
-  console.log("xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx")
-  console.log(req.body)
-  console.log(blob)
-  console.log(userId)
   new Promise((resolve,reject) => {
     connection.query(`INSERT INTO my values(?,?) `,
       [userId,blob],
@@ -682,15 +692,13 @@ app.post('/avatar',function(req, res) {
 
 // ------------favorite---------------
 app.post('/favorite',function(req, res) {
-  const id = req.body.id
+  const id = uuid.v4()
   const articleId = req.body.articleId
-  const userId = req.body.userId
-  const createTime = req.body.createTime
-
-
+  const nickname = req.body.nickname
+  const createTime = new Date().getTime()
   new Promise((resolve,reject) => {
     connection.query(`INSERT INTO favorite VALUES(?,?,?,?)`,
-      [id, articleId, userId, createTime],
+      [id, articleId, nickname, createTime],
       (err, result) => {
       if(err){
         console.log(err)
@@ -714,10 +722,10 @@ app.post('/favorite',function(req, res) {
 // ------------getFavorite---------------
 app.post('/getFavorite',function(req, res) {
   const articleId = req.body.articleId
-  const userId = req.body.userId
+  const nickname = req.body.nickname
   new Promise((resolve,reject) => {
-    connection.query(`SELECT COUNT(id) as count FROM favorite WHERE articleId = ? and userId = ?`,
-      [articleId, userId],
+    connection.query(`SELECT COUNT(id) as count FROM favorite WHERE articleId = ? and nickname = ?`,
+      [articleId, nickname],
       (err, result) => {
       if(err){
         console.log(err)
@@ -741,10 +749,10 @@ app.post('/getFavorite',function(req, res) {
 // ------------cancelFavorite---------------
 app.post('/cancelFavorite',function(req, res) {
   const articleId = req.body.articleId
-  const userId = req.body.userId
+  const nickname = req.body.nickname
   new Promise((resolve,reject) => {
-    connection.query(`DELETE FROM favorite WHERE articleId = ? and userId = ?`,
-      [articleId, userId],
+    connection.query(`DELETE FROM favorite WHERE articleId = ? and nickname = ?`,
+      [articleId, nickname],
       (err, result) => {
       if(err){
         console.log(err)
@@ -766,12 +774,12 @@ app.post('/cancelFavorite',function(req, res) {
 
 // ------------sendComment---------------
 app.post('/sendComment',function(req, res) {
-  const id = req.body.id
+  const id = uuid.v4()
   const topicId = req.body.topicId
   const topicType = req.body.topicType
   const content = req.body.content
   const fromUid = req.body.fromUid
-  const createTime = req.body.createTime
+  const createTime = new Date().getTime()
   const like = req.body.like
 
 
@@ -800,7 +808,7 @@ app.post('/sendComment',function(req, res) {
 
 // ------------sendReply---------------
 app.post('/sendReply',function(req, res) {
-  const id = req.body.id
+  const id = uuid.v4()
   const commentId = req.body.commentId
   const replyId = req.body.replyId
   const replyType = req.body.replyType
@@ -809,7 +817,7 @@ app.post('/sendReply',function(req, res) {
   const fromNickname = req.body.fromNickname
   const fromAvatar = req.body.fromAvatar
   const toUid = req.body.toUid
-  const createTime = req.body.createTime
+  const createTime = new Date().getTime()
 
 
   new Promise((resolve,reject) => {
@@ -853,6 +861,8 @@ app.post('/getComment',function(req, res) {
       }
     )
   })
+  //`SELECT r.comment_id,r.content,r.createTime,r.from_uid,r.fromNickname,r.fromAvatar,r.reply_id,r.reply_type,r.to_uid,u.nickname,u.avatar FROM replys r LEFT JOIN users u ON r.to_uid = u.id WHERE r.comment_id = ? ORDER BY r.createTime DESC
+
   .then(comments => {
     connection.query(
       `SELECT r.comment_id,r.content,r.createTime,r.from_uid,r.fromNickname,r.fromAvatar,r.reply_id,r.reply_type,r.to_uid,u.nickname,u.avatar FROM replys r LEFT JOIN users u ON r.to_uid = u.id WHERE r.comment_id = ? ORDER BY r.createTime DESC
@@ -903,12 +913,12 @@ app.post('/toUidFormat', function(req, res) {
 
 // ------------likeData-----------------
 app.post('/likeData', function(req, res) {
-  const userId = req.body.userId
+  const nickname = req.body.nickname
   const currentPage = req.body.currentPage
   console.log(currentPage)
   new Promise((resolve, reject) => {
-    connection.query('SELECT count(id) as count FROM favorite  WHERE userId = ?',
-      [userId],
+    connection.query('SELECT count(id) as count FROM favorite  WHERE nickname = ?',
+      [nickname],
       (err, count) => {
         if(err) {
           console.log(err)
@@ -919,8 +929,8 @@ app.post('/likeData', function(req, res) {
       })
   })
   .then( count => {
-    connection.query('SELECT a.* FROM favorite f LEFT JOIN article a ON f.articleId = a.id WHERE f.userId = ? ORDER BY f.createTime DESC limit ?,6',
-      [userId, (currentPage-1)*6],
+    connection.query('SELECT a.*,f.nickname FROM favorite f LEFT JOIN article a ON f.articleId = a.id WHERE f.nickname = ? ORDER BY f.createTime DESC limit ?,6',
+      [nickname, (currentPage-1)*6],
       (err, data) => {
         if(err) {
           console.log(err)
@@ -969,13 +979,12 @@ app.post('/updateNickname',function(req, res) {
         console.log(resolve.code)
         // 数据库更新成功同时查询数据库并返回结果
         if( resolve.code === 0) {
-          // connection.query('SELECT * FROM users WHERE id = ?',[req.body.userId],(err, result) => {
-          //   if(err) {
-          //     console.log(err)
-          //     return
-          //   }
-          // })
-          // resolve.user = result
+          connection.query('UPDATE replys SET fromNickname = ? where from_uid = ?',[req.body.nickname,req.body.userId],(err, result) => {
+            if(err) {
+              console.log(err)
+              return
+            }
+          })
           resolve.nickname = req.body.nickname
           res.send(resolve)
         }
@@ -1398,17 +1407,37 @@ app.post("/updatePassword",(req, res) => {
   )
 })
 
+// 反馈
+app.post("/submitFeedback", (req, res) => {
+  const id = uuid.v4()
+  const userId = req.body.userId
+  const title = req.body.title
+  const content = req.body.content
+  let createTime = new Date().getTime()
+  connection.query("INSERT INTO feedback VALUES(?,?,?,?,?)",
+    [id,userId,title,content,createTime],
+    (err, result) => {
+      if(err) {
+        res.send({code: 0, message: "发送反馈失败"})
+        console.log(err)
+        return
+      }
+      res.send({code: 1, message: "发送反馈成功"})
+    })
+})
+
 // 订阅者
-app.post("/subscription",(req, res) => {
-  const email = req.body
-  connection.query("SELECT * FROM subscription WHERE email = ? limit 1",[eamil],(err,result) => {
+app.post("/submitsubscription",(req, res) => {
+  const email = req.body.email
+  connection.query("SELECT * FROM subscription WHERE email = ? limit 1",[email],(err,result) => {
     if(err) {
       res.send({code: 0,message: "服务器出错,订阅失败"})
       console.log(err)
       return
     }
-    if(result.length > 0) {
-      connection.query("INSERT INTO subscription Values(?,?)",[uuid.v4(),eamil],(err,data) => {
+    if(result.length < 1) {
+      // 未订阅
+      connection.query("INSERT INTO subscription Values(?,?,?)",[uuid.v4(),email,new Date().getTime()],(err,data) => {
         if(err) {
           res.send({code: 0,message: "服务器出错,订阅失败"})
           console.log(err)
@@ -1417,11 +1446,137 @@ app.post("/subscription",(req, res) => {
         res.send({code: 1,message: "订阅成功"})
 
       })
+    } else {
+      //  已订阅
+      res.send({code: 1,message: "邮箱已订阅"})
+    }
+  })
+})
+// 查询是否设置密保
+app.post("/isSetProtect",(req, res) => {
+  connection.query(`SELECT count(id) as count FROM safe WHERE userId = ?`,[req.body.id],(err, result) => {
+    if(err) {
+      res.send({code: 0, message: "服务器错误"})
+      console.log(err)
+      return
+    }
+    const count = result[0].count
+    if( count === 0 ) {
+      res.send({code: 1, message: "未设置"})
+    }
+    if( count > 0 ) {
+      res.send({code: 2, message: "已设置"})
     }
   })
 })
 
+// ------- 获取站内图片
+app.post("/imagesData",(req, res) => {
+  connection.query(`SELECT * FROM images ORDER BY createTime DESC`,(err, result) => {
+    if(err) {
+      res.send({code: 0, message: "服务器错误"})
+      console.log(err)
+      return
+    }
+    res.send({code: 1, imagesData: result})
+  })
+})
 
+
+// ----------- 删除图片
+app.post("/deleteImage",(req, res) => {
+  connection.query(`SELECT img FROM images WHERE id = ?`,[req.body.id],(err, result) => {
+    if(err) {
+      res.send({code: 0, message: "服务器错误"})
+      console.log(err)
+      return
+    }
+    fs.unlink(path.join(`./public/uploads`+result[0].img),(err) => {
+      if(err) {
+        return console.log(err)
+      }
+    })
+    connection.query(`DELETE FROM images WHERE id = ?`,[req.body.id],(err, data) => {
+      if(err) {
+        res.send({code: 0, message: "服务器错误"})
+        console.log(err)
+        return
+      }
+      res.send({code: 1, message: "删除成功"})
+    })
+  })
+  
+})
+
+// ------------- 提交图片 ---------------
+
+storage = multer.diskStorage({
+  // destination:'public/uploads/'+new Date().getFullYear() + (new Date().getMonth()+1) + new Date().getDate(),
+  destination(req,res,cb){
+    cb(null,'public/uploads/images');
+  },
+  filename(req,file,cb){
+    let filenameArr = file.originalname.split('.');
+    cb(null,Date.now() + '-' + uuid.v4() + file.originalname.substring(0,file.originalname.indexOf('.')) + '.' + filenameArr[filenameArr.length-1]);
+  }
+});
+
+upload = multer({storage});
+
+app.post('/addImg', upload.single("file"), function(req, res) {
+  let imgSrc = `/images/` + req.file.filename
+  
+  const id = uuid.v4()
+  const type = req.body.type
+  const time = new Date().getTime()
+  new Promise((resolve, reject) => {
+    connection.query('INSERT INTO images VALUES(?,?,?,?)',
+      [id,imgSrc,type,time],
+      (err, result) => {
+        if(err) {
+          res.send({code: 0, message: "服务器错误"})
+          console.log(err)
+          return
+        }
+        res.send({code: 1, message: "上传成功"})
+      }
+    )
+  })
+})
+// 获取评论数据
+app.post("/getCommentData",(req, res) => {
+  new Promise( (resovle, reject) => {
+    connection.query(`SELECT count(id) as count FROM comments`,(err, result) => {
+      if(err) {
+        res.send({code: 0, message: "获取评论失败"})
+        console.log(err)
+        return
+      }
+      resovle(result[0])
+    })
+  }).then( count => {
+    connection.query(`SELECT c.*,u.nickname,a.title title FROM comments c LEFT JOIN users u ON c.from_uid = u.id LEFT JOIN article a ON c.topic_id = a.id ORDER BY c.createTime DESC LIMIT ?,10`
+    ,[(req.body.currentPage - 1)*10],(err, result) => {
+      if(err) {
+        res.send({code: 0, message: "获取评论失败"})
+        console.log(err)
+        return
+      }
+      res.send({code: 1, message: "获取评论成功",totalCount: count,comments: result})
+    })
+  })
+})
+// 删除评论
+app.post("/deleteComment",(req, res) => {
+  connection.query(`DELETE FROM comments WHERE id in (?)`,[req.body.id],(err, result) => {
+    if(err) {
+      res.send({code: 0, message: "删除评论失败"})
+      console.log(err)
+      return
+    }
+    res.send({code: 1, message: "删除评论成功"})
+  })
+})
 //dac27c8e7534098909bb93af3eb
 app.listen(3001,function () {    ////监听3000端口
     console.log('Server running at 3001 port');
